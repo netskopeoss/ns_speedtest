@@ -141,8 +141,11 @@ If(-Not $NoFiles){
    }
 }
 
+#convert to absolute path for jobs
+$OutputFolder=Resolve-Path -Path $OutputFolder | select -ExpandProperty Path
+
 function Timestamp {
-   return Get-Date -f s
+   return (Get-Date -f s) + (Get-Date -f zzz)
 }
 
 If ($NoFiles -and $Quiet){
@@ -198,7 +201,7 @@ Stop-Job -Name NsSpeedtest*
 Remove-job -Name NsSpeedtest*
 
 If(-Not $NoFiles){
-   Start-Job -Name NsSpeedtestCpu -ScriptBlock { for ($i=1; $i -le $args[0]; $i=$i+1) {  Get-Date -f s >> $args[1] ; $p = get-counter '\Process(*)\% Processor Time'; $p.CounterSamples | sort -des CookedValue | select -f 15 >> $args[1] }} -ArgumentList $DefaultMaxStats, $OutputFileCpu
+   Start-Job -Name NsSpeedtestCpu -ScriptBlock { for ($i=1; $i -le $args[0]; $i=$i+1) {  (Get-Date -f s) + (Get-Date -f zzz) >> $args[1] ; $p = get-counter '\Process(*)\% Processor Time'; $p.CounterSamples | sort -des CookedValue | select -f 15 >> $args[1] }} -ArgumentList $DefaultMaxStats, $OutputFileCpu | Out-Null
 }
 
 $StartTime=Timestamp
@@ -264,19 +267,29 @@ $WindowsDetails=(systeminfo) -join [Environment]::NewLine
 Cprintf -Mode "default" -Text "$WindowsDetails"
 
 Cprintf -Mode "default" -Text "*** Netskope Client Configuration"
-$ClientConfiguration=(cmd /c "$nsdiag" -f) -join [Environment]::NewLine
-Cprintf -Mode "default" -Text "${ClientConfiguration}"
+If(Test-Path $nsdiag -PathType leaf){
+   $ClientConfiguration=(cmd /c "$nsdiag" -f) -join [Environment]::NewLine
+   Cprintf -Mode "default" -Text "${ClientConfiguration}"
+}else{
+   Cprintf -Mode "error" -Text "WARNING: Netskope Client nsdiag not found"
+   $ClientConfiguration=""
+}
+
 Cprintf -Mode "default" -Text "*** Netskope context"
-$DpGatewayLdns=$Management=Select-String -Path "C:\ProgramData\netskope\stagent\nsconfig.json" -Pattern '"host": "(gateway-[^"]*)"' | % { $_.Matches.groups[1].value }
-Cprintf -Mode "default" -Text "DP Gateway LDNS    = ${DpGatewayLdns}"
-$DpGatewayLdnsIp=Resolve-DnsName -Type A -Name $DpGatewayLdns | % { $_.IPAddress -join ',' }
-Cprintf -Mode "default" -Text "DP Gateway LDNS IP = ${DpGatewayLdnsIp}"
-$Management=Select-String -Path "C:\ProgramData\netskope\stagent\nsconfig.json" -Pattern '"host": "gateway-([^"]*)"' | % { $_.Matches.groups[1].value }
-Cprintf -Mode "default" -Text "Management         = ${Management}"
-$Achecker="achecker-$Management"
-Cprintf -Mode "default" -Text "Achecker           = ${Achecker}"
-$AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
-Cprintf -Mode "default" -Text "Achecker Download  = ${AcheckerUrl}"
+If(Test-Path $nsconfig -PathType leaf){
+   $DpGatewayLdns=$Management=Select-String -Path "C:\ProgramData\netskope\stagent\nsconfig.json" -Pattern '"host": "(gateway-[^"]*)"' | % { $_.Matches.groups[1].value }
+   Cprintf -Mode "default" -Text "DP Gateway LDNS    = ${DpGatewayLdns}"
+   $DpGatewayLdnsIp=Resolve-DnsName -Type A -Name $DpGatewayLdns | % { $_.IPAddress -join ',' }
+   Cprintf -Mode "default" -Text "DP Gateway LDNS IP = ${DpGatewayLdnsIp}"
+   $Management=Select-String -Path "C:\ProgramData\netskope\stagent\nsconfig.json" -Pattern '"host": "gateway-([^"]*)"' | % { $_.Matches.groups[1].value }
+   Cprintf -Mode "default" -Text "Management         = ${Management}"
+   $Achecker="achecker-$Management"
+   Cprintf -Mode "default" -Text "Achecker           = ${Achecker}"
+   $AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
+   Cprintf -Mode "default" -Text "Achecker Download  = ${AcheckerUrl}"
+}else{
+   Cprintf -Mode "error" -Text "WARNING: Netskope Client Configuration file not found"
+}
 
 
 If($ClientConfiguration -match "NSTUNNEL_CONNECTED")
@@ -309,7 +322,7 @@ If($ClientConfiguration -match "NSTUNNEL_CONNECTED")
 }
 
 If(-Not $NoFiles){
-   Start-Job -Name NsSpeedtestPing -ScriptBlock { ping.exe -n $args[0] -w 1000 $args[1]|Foreach{("{0} - {1}" -f (Get-Date -f s),$_)} |Out-File -Append -Filepath $args[2]} -ArgumentList $DefaultMaxStats, $PingDest, $OutputFileLatency
+   Start-Job -Name NsSpeedtestPing -ScriptBlock { ping.exe -n $args[0] -w 1000 $args[1]|Foreach{("{0} - {1}" -f ((Get-Date -f s) + (Get-Date -f zzz)),$_)} |Out-File -Append -Filepath $args[2]} -ArgumentList $DefaultMaxStats, $PingDest, $OutputFileLatency | Out-Null
 }
 
 If($Pcap){
