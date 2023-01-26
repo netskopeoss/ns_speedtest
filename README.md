@@ -6,7 +6,11 @@ This script helps to identify Throughput available on a device. Tests results ar
 
 # Main features
 
+* Windows and Mac supported, Linux will come next
 * Leverage download to Google Drive to calculate end to end performances
+* Calculate average on multiple iterations
+* CPU and latency recording
+* Latency and routing logging
 
 # Windows
 ## Usage
