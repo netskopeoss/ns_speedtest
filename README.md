@@ -13,10 +13,23 @@ This script helps to identify Throughput available on a device. Tests results ar
 * Latency and routing logging
 
 # Windows
+
+## Requirements
+Rights to execute powershell script.
+
+To enable Powershell rights, the following powershell command needs to be executed by an Administrator:
+```
+Set-ExecutionPolicy RemoteSigned
+```
+or
+```
+Set-ExecutionPolicy Unrestricted
+```
+
 ## Usage
 ```
 NAME
-    V:\ns_speedtest\ns_speedtest.ps1
+    ns_speedtest.ps1
 
 SYNOPSIS
     Netskope Performance troubleshooting script.
@@ -83,6 +96,20 @@ REMARKS
 
 ## Examples
 
+Simple run with default parameters:
+```
+ns_speedtest.ps1
+```
+Use 10MB instead of 100MB for download size:
+```
+ns_speedtest.ps1 -Size 10
+```
+Use 3 tests with 5s interval
+```
+ns_speedtest.ps1 -Loops 3 -Interval 5
+```
+
+
 # Mac
 ## Usage
 ```
@@ -101,3 +128,14 @@ Options:
 ```
 
 ## Examples
+Simple run with default parameters:
+```
+./ns_speedtest.sh
+```
+Use 10MB instead of 100MB for download size:
+```
+./ns_speedtest.sh -s 10
+```
+Use 3 tests with 5s interval
+```
+./ns_speedtest.sh -l 3 -i 5
