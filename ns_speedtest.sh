@@ -382,7 +382,7 @@ declare -a Destination DestinationType HttpVersion HttpCode SpeedDownload SizeDo
 # 	Url
 #   Url type
 # OUTPUTS: 
-# 	None
+# 	Speedtest results based on the configuration
 # RETURN: 
 # 	None
 ### FUNCTION END
