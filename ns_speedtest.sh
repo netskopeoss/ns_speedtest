@@ -3,17 +3,18 @@
 # Author: Matthieu Bouthors
 # Copyright Netskope
 
-usage() { printf "Usage: $0 [-i <nterval>] [-l <loops>] [-s <10|100>] [-u <download url>] -r -q -n -h -f folder
+usage() { printf "Usage: $0 [-s <10|100>] [-i <interval>] [-l <loops>] [-c <comment>] [-u <download url>] [-r] [-q] [-n] [-f <folder>] [-p] [-h]
 Options:
 -c comment
--p perform inner capture at the same time
 -i inverval in seconds
 -l loops
--u URL
--s size 10 or 100MB for gdrive download
+-s download size in MB (10 or 100)
+-u custom download URL (otherwise Google Drive is used)
 -r report mode, enable report mode on stdout, providing verbose output
 -q quiet mode, disable output to the stdout
 -n No Files mode, disable saving results in files
+-f custom folder to save log files, by default Netskope Client log folder is used
+-p perform inner capture at the same time
 -h help\n" 1>&2; exit 1; }
 
 #Defaults
@@ -32,7 +33,6 @@ DefaultMaxStats=300
 
 nsconfig="/Library/Application Support/Netskope/STAgent/nsconfig.json"
 nsdiag="/Library/Application Support/Netskope/STAgent/nsdiag"
-mtr="+"
 StatsCpu="top -l$DefaultMaxStats -n10 -i1"
 OutputFolder=false
 FilenameSpeedtest="nsspeedtest.log"
@@ -46,6 +46,9 @@ CurlFormat="%{http_version}|%{http_code}|%{speed_download}|%{size_download}|%{ti
 declare -a gdrive
 gdrive[10]="https://drive.google.com/uc?export=download&id=1UX-pO5OLPhv_hoUpk_ixu3IDmkHpqQoF"
 gdrive[100]="https://drive.google.com/uc?export=download&id=1VYSsMYB0w18tntQipTZPkq3cg58nmEEo"
+
+
+############## TEST PREPARATION ##############
 
 Arguments="$@"
 
@@ -97,6 +100,7 @@ if [ "$Comment" == false ]; then
     read Comment
 fi
 
+#Target Definition
 if [ "$UrlArgs" == false ]; then
     Target=${gdrive[$Size]}
     TargetType="gdrive"
@@ -105,37 +109,59 @@ else
     TargetType="custom"
 fi
 
-StartTime=$(date -Iseconds)
-
-
-#modes: 
-# - "default", print screen and file
-# - "report", print screen (if report mode) and always to file
-# Global to disable file output
-Cprintf(){
-    local PrintMode=$1; shift
-    local PrintText="$1"; shift
-    if [ $PrintMode == default ]; then
-        if [ $QuietMode == false ]; then
-            printf "$PrintText" "$@"
-        fi
-        if [ $NoFiles == false ]; then
-            printf "[$PID] $PrintText" "$@" >> $OutputFile
-        fi  
+#OS detection
+uname=$(uname -a)
+if [[ "$uname" =~ Darwin ]]; then
+    mode="mac"
+    if [ "$OutputFolder" == false ]; then
+        OutputFolder="/Library/Logs/Netskope"
     fi
-    if [ $PrintMode == report ]; then
-        if [ $ReportMode == true ]; then
-            if [ $QuietMode == false ]; then
-                printf "$PrintText" "$@"
-            fi
-        fi
-        if [ $NoFiles == false ]; then
-            printf "[$PID] $PrintText" "$@" >> $OutputFile
-        fi  
+else
+    printf "ERROR: Unsupported system\n"
+    exit
+fi
+
+#Output folder control
+if [ "$NoFiles" == false ]; then
+    if [ ! -d "$OutputFolder" ]; then
+        while true; do
+            read -p "Log folder not found, do you want to log in the local folder ([Y]es/No/Cancel)?" ync
+            case $ync in
+                [Yy]* ) OutputFolder="."; break;;
+                "")     OutputFolder="."; break;;
+                [Nn]* ) NoFiles=true; break;;
+                [Cc]* ) exit;;
+                * ) echo "Please answer Yes, No or Cancel";;
+            esac
+        done
     fi
-}
+fi
 
+# Setting up file names
+if [ "$NoFiles" == false ]; then
+    OutputFile="$OutputFolder/$FilenameSpeedtest"
+    OutputFileLatency="$OutputFolder/$FilenameLatency"
+    OutputFileCpu="$OutputFolder/$FilenameCpu"
+fi
 
+# Making sure there is an output and preparing end of command line to redirect outputs
+CommandEnd=""
+if [ "$QuietMode" == true ]; then
+    if [ "$NoFiles" == true ]; then
+        printf "ERROR: No output to files or screen, exiting\n"
+        exit
+    else
+        CommandEnd=">> $OutputFile 2>&1"
+    fi
+else
+    if [ "$NoFiles" == true ]; then
+        CommandEnd=""
+    else
+        CommandEnd="|tee -a $OutputFile"
+    fi
+fi
+
+# File rotation over 10MB
 RotateFile(){
     local File=$1
     if [ ! -f "$File" ]; then
@@ -157,64 +183,68 @@ RotateFile(){
     fi
 }
 
-
-
-uname=$(uname -a)
-if [[ "$uname" =~ Darwin ]]; then
-    mode="mac"
-    if [ "$OutputFolder" == false ]; then
-        OutputFolder="/Library/Logs/Netskope"
-    fi
-
-else
-    printf "Unsupported system\n"
-    exit
-fi
-
-
-if [ "$NoFiles" == false ]; then
-    if [ ! -d "$OutputFolder" ]; then
-        while true; do
-            read -p "Log folder not found, do you want to log in the local folder ([Y]es/No/Cancel)?" ync
-            case $ync in
-                [Yy]* ) OutputFolder="."; break;;
-                "")     OutputFolder="."; break;;
-                [Nn]* ) NoFiles=true; break;;
-                [Cc]* ) exit;;
-                * ) echo "Please answer Yes, No or Cancel";;
-            esac
-        done
-    fi
-fi
-
-if [ "$NoFiles" == false ]; then
-    OutputFile="$OutputFolder/$FilenameSpeedtest"
-    OutputFileLatency="$OutputFolder/$FilenameLatency"
-    OutputFileCpu="$OutputFolder/$FilenameCpu"
-fi
-
-CommandEnd=""
-
-if [ "$QuietMode" == true ]; then
-    if [ "$NoFiles" == true ]; then
-        printf "No output to files or screen, exiting\n"
-        exit
-    else
-        CommandEnd=">> $OutputFile"
-    fi
-else
-    if [ "$NoFiles" == true ]; then
-        CommandEnd=""
-    else
-        CommandEnd="|tee -a $OutputFile"
-    fi
-fi
-
 if [ "$NoFiles" == false ]; then
     RotateFile "$OutputFile"
     RotateFile "$OutputFileLatency"
     RotateFile "$OutputFileCpu"
 fi
+
+
+############## TEST START ##############
+
+StartTime=$(date -Iseconds)
+
+
+#### FUNCTION BEGIN
+# Print output to stdout and file
+# GLOBALS: 
+#   QuietMode, ReportMode, NoFiles, PID, OutputFile
+# ARGUMENTS: 
+#   Print mode:
+#    - "default", print screen and file
+#    - "report", print screen (if report mode) and always to file
+#   Print text: string to print
+# OUTPUTS: 
+#   Print text on the screen based on parameters
+# RETURN: 
+#   None
+### FUNCTION END
+#modes: 
+# - "default": print screen and file, follow Quiet and NoFiles flags
+# - "report": output files only but default, follows NoFiles and Report flags
+# - "error": output always screen, follow NoFiles flag
+# Global to disable file output
+Cprintf(){
+    local PrintMode=$1; shift
+    local PrintText="$1"; shift
+    if [ $PrintMode == error ]; then
+        printf "$PrintText" "$@"
+        if [ $NoFiles == false ]; then
+            printf "[$PID] $PrintText" "$@" >> $OutputFile
+        fi  
+    fi
+
+    if [ $PrintMode == default ]; then
+        if [ $QuietMode == false ]; then
+            printf "$PrintText" "$@"
+        fi
+        if [ $NoFiles == false ]; then
+            printf "[$PID] $PrintText" "$@" >> $OutputFile
+        fi  
+    fi
+    if [ $PrintMode == report ]; then
+        if [ $ReportMode == true ]; then
+            if [ $QuietMode == false ]; then
+                printf "$PrintText" "$@"
+            fi
+        fi
+        if [ $NoFiles == false ]; then
+            printf "[$PID] $PrintText" "$@" >> $OutputFile
+        fi  
+    fi
+}
+
+
 
 case "$mode" in
     mac)
@@ -223,7 +253,7 @@ case "$mode" in
         Cprintf "default" "%s\n" "$MacDetails"
         ;;
     *)
-        Cprintf "default" "Unsupported system\n"
+        Cprintf "error" "ERROR: Unsupported system\n"
         exit
         ;;
 esac
@@ -251,23 +281,32 @@ Cprintf "report" "Curl Format = %s\n" "${CurlFormat}"
 Cprintf "report" "%s\n" "$uname"
 
 
-#context
 Cprintf "default" "***** DEVICE CONTEXT ***** %s\n" "$Comment"
 
 Cprintf "default" "*** Netskope Client Configuration\n"
-ClientConfiguration=$("$nsdiag" -f)
-Cprintf "default" "%s\n" "${ClientConfiguration}"
+if [ -f "$nsdiag" ]; then
+    ClientConfiguration=$("$nsdiag" -f)
+    Cprintf "default" "%s\n" "${ClientConfiguration}"
+else
+    ClientConfiguration=""
+    Cprintf "error" "WARNING: Netskope Client nsdiag not found\n"
+fi
+
 Cprintf "default" "*** Netskope context\n"
-DpGatewayLdns=$(grep '"host": "gateway-' "${nsconfig}"|cut -d'"' -f4)
-Cprintf "default" "DP Gateway LDNS    = %s\n" "${DpGatewayLdns}"
-DpGatewayLdnsIp=$(dig +short "$DpGatewayLdns")
-Cprintf "default" "DP Gateway LDNS IP = %s\n" "${DpGatewayLdnsIp}"
-Management=$(echo $DpGatewayLdns|cut -d"-" -f2)
-Cprintf "default" "Management         = %s\n" "${Management}"
-Achecker="achecker-$Management"
-Cprintf "default" "Achercker          = %s\n" "${Achecker}"
-AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
-Cprintf "default" "Achecker Download   = %s\n" "${AcheckerUrl}"
+if [ -f "${nsconfig}" ]; then
+    DpGatewayLdns=$(grep '"host": "gateway-' "${nsconfig}"|cut -d'"' -f4)
+    Cprintf "default" "DP Gateway LDNS    = %s\n" "${DpGatewayLdns}"
+    DpGatewayLdnsIp=$(dig +short "$DpGatewayLdns")
+    Cprintf "default" "DP Gateway LDNS IP = %s\n" "${DpGatewayLdnsIp}"
+    Management=$(echo $DpGatewayLdns|cut -d"-" -f2)
+    Cprintf "default" "Management         = %s\n" "${Management}"
+    Achecker="achecker-$Management"
+    Cprintf "default" "Achercker          = %s\n" "${Achecker}"
+    AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
+    Cprintf "default" "Achecker Download   = %s\n" "${AcheckerUrl}"
+else
+    Cprintf  "error" "WARNING: Netskope Client Configuration file not found\n"
+fi
 
 if [[ "${ClientConfiguration}" =~ NSTUNNEL_CONNECTED ]]
 then
@@ -290,7 +329,7 @@ else
     Cprintf "default" "Tunnel NOT Connected\n"
     PingDest="drive.google.com"
     if [ "$PcapMode" == true ]; then
-        Cprintf "default" "Disabling Pcap because tunnel is not connected\n"
+        Cprintf "error" "ERROR: Disabling Pcap because tunnel is not connected\n"
         PcapMode=false
     fi
 	
@@ -307,15 +346,16 @@ NetstatOutput=$(netstat -rn)
 Cprintf "report" "%s\n" "$NetstatOutput"
 
 Cprintf "report" "Starting traceroute to $PingDest\n"
-eval "traceroute -q1 -w2 -m 30 $PingDest $CommandEnd"
+eval "traceroute -q1 -w2 -m20 $PingDest $CommandEnd"
 
 
-Cprintf "default" "***** SPEEDTEST ***** %s\n" "$Comment"
+############## BACKGROUND MONITORING ##############
 
 if [ "$PcapMode" == true ]; then
     Pcap=$("$nsdiag" -c start -s 60)
     Cprintf "default" "$Pcap\n"
 fi
+
 PingPid=false
 TopPid=false
 if [ "$NoFiles" == false ]; then
@@ -328,20 +368,23 @@ if [ "$NoFiles" == false ]; then
     Cprintf "default" "*** Cpu recording started (%s)\n" "$CpuPid"
 fi
 
+
+############## TEST FUNCTIONS ##############
+
 declare -a Destination DestinationType HttpVersion HttpCode SpeedDownload SizeDownload TimeTotal TimeStarttransfer TimeNamelookup TimeConnect TimeAppconnect TimePretransfer TimeRedirect TimeDownload Throughput NiceThroughput NiceSpeedDownload NiceSizeDownload DurationNamelookup DurationConnect DurationAppconnect DurationPretransfer DurationRedirect DurationStarttransfer
 
 #### FUNCTION BEGIN
 # Perform speedtest
 # GLOBALS: 
-# 	Debug CurlFormat Mega Destination HttpVersion HttpCode SpeedDownload SizeDownload TimeTotal TimeStarttransfer TimeNamelookup TimeConnect TimeAppconnect TimePretransfer TimeRedirect TimeDownload Throughput NiceThroughput NiceSpeedDownload NiceSizeDownload DurationNamelookup DurationConnect DurationAppconnect DurationPretransfer DurationRedirect DurationStarttransfer
+# 	CurlFormat Mega Destination HttpVersion HttpCode SpeedDownload SizeDownload TimeTotal TimeStarttransfer TimeNamelookup TimeConnect TimeAppconnect TimePretransfer TimeRedirect TimeDownload Throughput NiceThroughput NiceSpeedDownload NiceSizeDownload DurationNamelookup DurationConnect DurationAppconnect DurationPretransfer DurationRedirect DurationStarttransfer
 # ARGUMENTS: 
-#       Array Inder
+#   Array Index
 # 	Url
-#       Url type
+#   Url type
 # OUTPUTS: 
-# 	TBD
+# 	None
 # RETURN: 
-# 	TBD
+# 	None
 ### FUNCTION END
 SpeedTest() {
     local i="$1"
@@ -407,6 +450,9 @@ SpeedTest() {
 }
 
 
+############## TEST LOOPS ##############
+
+Cprintf "default" "***** SPEEDTEST ***** %s\n" "$Comment"
 
 i=1
 Index=0
@@ -421,7 +467,7 @@ do
         
         if [ $StatusCode -ne 200 ]
         then
-            Cprintf "default" "ERROR Wrong status code %s\n" "${HttpCode[$Index]}"
+            Cprintf "error" "ERROR: Wrong status code %s\n" "${HttpCode[$Index]}"
             exit
         fi
     fi
@@ -433,7 +479,7 @@ do
 
     if [ "$StatusCode" -ne 200 ]
     then
-        Cprintf "default" "ERROR Wrong status code %s\n" "${StatusCode}"
+        Cprintf "error" "ERROR: Wrong status code %s\n" "${StatusCode}"
 	exit
     fi
 
@@ -441,6 +487,8 @@ do
     eval "ping --apple-time -c${Interval} ${PingDest} ${CommandEnd}"
 done
 
+
+############## EXPORT ##############
 
 Cprintf "default" "***** EXPORT ***** %s\n" "$Comment"
 Cprintf "default" "Date Size(MB) Throughput(Mbps) \"End to End speed(Mbps)\" \"StartTransfert time(s)\" \"Download time(s)\" \"Total time(s)\" \"HTTP code\" \"HTTP Version\" \"DNS(ms)\" \"Connect(ms)\" \"App(ms)\" \"Pretransfer(ms)\" \"Redirect(ms)\" \"Starttransfer(ms)\" Destination\n"
@@ -450,13 +498,13 @@ do
     Cprintf "default" "%s %s %s %s %.3f %.3f %.3f %.3f %s %s %s %s %s %s %s %s %s %s\n" "${DateStr[$i]}" "${DestinationType[$i]}" ${NiceSizeDownload[$i]} ${NiceThroughput[$i]} ${NiceSpeedDownload[$i]} ${TimeStarttransfer[$i]} ${TimeDownload[$i]} ${TimeTotal[$i]} ${HttpCode[$i]} ${HttpVersion[$i]} "${DurationNamelookup[$i]}" "${DurationConnect[$i]}" "${DurationAppconnect[$i]}" "${DurationPretransfer[$i]}" "${DurationRedirect[$i]}" "${DurationStarttransfer[$i]}" "${Destination[$i]}"
 done
 
-
+############## STATISTICS ##############
 
 Cprintf "default" "***** STATISTICS ***** %s\n" "$Comment"
 
 declare Max Min Total Avg
 
-
+#Analyze perform Average,Min,Max compute for a property of the results
 function Analyze() {
     [ "$#" -gt 1 ] || return
 

@@ -111,6 +111,7 @@ $gdrive=@{}
 $gdrive[10]="https://drive.google.com/uc?export=download&id=1UX-pO5OLPhv_hoUpk_ixu3IDmkHpqQoF"
 $gdrive[100]="https://drive.google.com/uc?export=download&id=1VYSsMYB0w18tntQipTZPkq3cg58nmEEo"
 
+#Target Definition
 If($Url){
    $TargetType="custom"
    $Target=$Url
@@ -119,6 +120,7 @@ If($Url){
    $TargetType="gdrive"
 }
 
+#Output folder control
 If($LogFolder){
    $OutputFolder=$LogFolder
 }
@@ -144,21 +146,20 @@ If(-Not $NoFiles){
 #convert to absolute path for jobs
 $OutputFolder=Resolve-Path -Path $OutputFolder | select -ExpandProperty Path
 
-function Timestamp {
-   return (Get-Date -f s) + (Get-Date -f zzz)
-}
-
-If ($NoFiles -and $Quiet){
-   Write-Host "ERROR: No output to files or screen, exiting"
-   Exit
-}
-
+# Setting up file names
 If(-Not $NoFiles){
    $global:OutputFile="$OutputFolder\$FilenameSpeedtest"
    $OutputFileLatency="$OutputFolder\$FilenameLatency"
    $OutputFileCpu="$OutputFolder\$FilenameCpu"
 }
 
+# Making sure there is an output
+If ($NoFiles -and $Quiet){
+   Write-Host "ERROR: No output to files or screen, exiting"
+   Exit
+}
+
+# File rotation over 10MB
 function RotateFile(){
    [CmdletBinding()]
    param(
@@ -189,19 +190,10 @@ If(-Not $NoFiles){
 }
 
 
-function Top {
-    While(1) {  
-      Timestamp >> $OutputFileCpu
-      $p = get-counter '\Process(*)\% Processor Time'
-      $p.CounterSamples | sort -des CookedValue | select -f 15 >> $OutputFileCpu
-      sleep 2
-   }
-}
-Stop-Job -Name NsSpeedtest*
-Remove-job -Name NsSpeedtest*
+############## TEST START ##############
 
-If(-Not $NoFiles){
-   Start-Job -Name NsSpeedtestCpu -ScriptBlock { for ($i=1; $i -le $args[0]; $i=$i+1) {  (Get-Date -f s) + (Get-Date -f zzz) >> $args[1] ; $p = get-counter '\Process(*)\% Processor Time'; $p.CounterSamples | sort -des CookedValue | select -f 15 >> $args[1] }} -ArgumentList $DefaultMaxStats, $OutputFileCpu | Out-Null
+function Timestamp {
+   return (Get-Date -f s) + (Get-Date -f zzz)
 }
 
 $StartTime=Timestamp
@@ -316,18 +308,9 @@ If($ClientConfiguration -match "NSTUNNEL_CONNECTED")
    Cprintf -Mode "default" -Text "Tunnel NOT Connected"
    $PingDest="drive.google.com"
    If ($Pcap){
-     Cprintf -Mode "default" -Text "Disabling Pcap because tunnel is not connected"
+     Cprintf -Mode "error" -Text "ERROR: Disabling Pcap because tunnel is not connected"
      $Pcap=$false
    }
-}
-
-If(-Not $NoFiles){
-   Start-Job -Name NsSpeedtestPing -ScriptBlock { ping.exe -n $args[0] -w 1000 $args[1]|Foreach{("{0} - {1}" -f ((Get-Date -f s) + (Get-Date -f zzz)),$_)} |Out-File -Append -Filepath $args[2]} -ArgumentList $DefaultMaxStats, $PingDest, $OutputFileLatency | Out-Null
-}
-
-If($Pcap){
-    $PcapOutput=(cmd /c "$nsdiag" -c start -s 60) -join [Environment]::NewLine
-    Cprintf -Mode "default" -Text $PcapOutput
 }
 
 #search for real public IP, ifconfig.me need to be steered by Netskope
@@ -341,7 +324,33 @@ Cprintf -Mode "report" -Text "*** Device Route table"
 $NetstatOutput=(netstat.exe -rn) -join [Environment]::NewLine
 Cprintf -Mode "report" -Text $NetstatOutput
 
-Cprintf -Mode "default" -Text "***** SPEEDTEST ***** $Comment"
+
+############## BACKGROUND MONITORING ##############
+
+If($Pcap){
+   $PcapOutput=(cmd /c "$nsdiag" -c start -s 60) -join [Environment]::NewLine
+   Cprintf -Mode "default" -Text $PcapOutput
+}
+
+function Top {
+    While(1) {  
+      Timestamp >> $OutputFileCpu
+      $p = get-counter '\Process(*)\% Processor Time'
+      $p.CounterSamples | sort -des CookedValue | select -f 15 >> $OutputFileCpu
+      sleep 2
+   }
+}
+#remove unfinished jobs
+Stop-Job -Name NsSpeedtest*
+Remove-job -Name NsSpeedtest*
+
+If(-Not $NoFiles){
+   Start-Job -Name NsSpeedtestCpu -ScriptBlock { for ($i=1; $i -le $args[0]; $i=$i+1) {  (Get-Date -f s) + (Get-Date -f zzz) >> $args[1] ; $p = get-counter '\Process(*)\% Processor Time'; $p.CounterSamples | sort -des CookedValue | select -f 15 >> $args[1] }} -ArgumentList $DefaultMaxStats, $OutputFileCpu | Out-Null
+   Start-Job -Name NsSpeedtestPing -ScriptBlock { ping.exe -n $args[0] -w 1000 $args[1]|Foreach{("{0} - {1}" -f ((Get-Date -f s) + (Get-Date -f zzz)),$_)} |Out-File -Append -Filepath $args[2]} -ArgumentList $DefaultMaxStats, $PingDest, $OutputFileLatency | Out-Null
+}
+
+
+############## TEST FUNCTIONS ##############
 
 #TestResult class is used to store Speedtest results, analysis and output
 Class TestResult {
@@ -374,7 +383,7 @@ Class TestResult {
    [int]$DurationRedirect
    [int]$DurationStarttransfer
 
-
+# Calculate additional values of the tests
    [void] CalculateValues(){
       $this.TimeDownload=$this.TimeTotal - $this.TimeStarttransfer
       $this.Throughput=$this.SizeDownload * 8 / $this.TimeDownload
@@ -394,7 +403,7 @@ Class TestResult {
       }
    }
 
-
+# Import curl output
    [void] ImportCurlResult([string]$TestTime, [string]$Url, [string]$UrlType, [string]$TestResult){
       $this.Time=$TestTime
       $this.Destination=$Url
@@ -421,6 +430,7 @@ Class TestResult {
       $this.CalculateValues()
    }
 
+# Display  test details
    [void] CprintfTest(){
       Cprintf -Mode "default" -Text ("http version:       {0}" -f $this.HttpVersion)
       Cprintf -Mode "default" -Text ("http code:          {0}" -f $this.HttpCode)
@@ -464,9 +474,13 @@ function SpeedTest {
    return $Test
 }
 
+############## TEST LOOPS ##############
+
+Cprintf -Mode "default" -Text "***** SPEEDTEST ***** $Comment"
+
 #Array for results
 $SpeedTestResults=@{}
-#Array for dedicated tunnel speedtest
+#Second Array for dedicated tunnel speedtest
 $TunnelSpeedTestResults=@{}
 
 for ($i=1; $i -le $loops; $i=$i+1)
@@ -493,13 +507,21 @@ for ($i=1; $i -le $loops; $i=$i+1)
    ping.exe -n $Interval -w 1000 $PingDest|Foreach{Cprintf -Mode "default" -Text ("{0} - {1}" -f (Timestamp),$_)}
 }
 
+
+############## EXPORT ##############
+
 Cprintf -Mode "default" -Text "***** EXPORT ***** $Comment"
 Cprintf -Mode "default" -Text "Date Size(MB) Throughput(Mbps) ""End to End speed(Mbps)"" ""StartTransfert time(s)"" ""Download time(s)"" ""Total time(s)"" ""HTTP code"" ""HTTP Version"" ""DNS(ms)"" ""Connect(ms)"" ""App(ms)"" ""Pretransfer(ms)"" ""Redirect(ms)"" ""Starttransfer(ms)"" Destination"
 for ($i=1; $i -le [int]$loops; $i=$i+1)
 {
    Cprintf -Mode "default" -Text $SpeedTestResults[$i].Export()
+   If ($Connected){
+      Cprintf -Mode "default" -Text $TunnelSpeedTestResults[$i].Export()
+   }
 }
 
+
+############## STATISTICS ##############
 
 Cprintf -Mode "default" -Text "***** STATISTICS ***** $Comment"
 

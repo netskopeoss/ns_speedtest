@@ -113,17 +113,18 @@ ns_speedtest.ps1 -Loops 3 -Interval 5
 # Mac
 ## Usage
 ```
-Usage: ./ns_speedtest.sh [-i <nterval>] [-l <loops>] [-s <10|100>] [-u <download url>] -r -q -n -h -f folder
+Usage: ./ns_speedtest.sh [-s <10|100>] [-i <interval>] [-l <loops>] [-c <comment>] [-u <download url>] [-r] [-q] [-n] [-f <folder>] [-p] [-h]
 Options:
 -c comment
--p perform inner capture at the same time
 -i inverval in seconds
 -l loops
--u URL
--s size 10 or 100MB for gdrive download
+-s download size in MB (10 or 100)
+-u custom download URL (otherwise Google Drive is used)
 -r report mode, enable report mode on stdout, providing verbose output
 -q quiet mode, disable output to the stdout
 -n No Files mode, disable saving results in files
+-f custom folder to save log files, by default Netskope Client log folder is used
+-p perform inner capture at the same time
 -h help
 ```
 
