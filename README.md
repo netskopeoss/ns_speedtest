@@ -1,8 +1,8 @@
-# ns_speedtest - Netskope Performance troubleshooting script.
+# ns_speedtest - Netskope Performance Troubleshooting Tool
 
 # Introduction
 
-This script helps to identify Throughput available on a device. Tests results are displayed on the command line and in log files.
+This tool helps to identify Throughput available on a device. Tests results are displayed on the command line and in log files.
 
 # Main features
 
@@ -32,7 +32,7 @@ NAME
     ns_speedtest.ps1
 
 SYNOPSIS
-    Netskope Performance troubleshooting script.
+    Netskope Performance troubleshooting tool.
 
 
 SYNTAX

@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
 
-Netskope Performance troubleshooting script.
+Netskope Performance Troubleshooting Tool
 
 .Description
 
-This script helps to identify Throughput available on a device. Tests results are displayed on the command line and in log files.
+This tool helps to identify Throughput available on a device. Tests results are displayed on the command line and in log files.
 
 .PARAMETER Size
 
@@ -57,13 +57,18 @@ https://github.com/netskopeoss/ns_speedtest
 
 #>
 
-
-
 #! /usr/bin/pwsh
 
-# Netskope Performance troubleshooting tool
+# Copyright 2022 Netskope Inc
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https:#www.apache.org/licenses/LICENSE-2.0
+#
+# Netskope Performance Troubleshooting Tool
 # Author: Matthieu Bouthors
-# Copyright Netskope
 
 
 [CmdletBinding()]

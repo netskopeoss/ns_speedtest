@@ -1,7 +1,14 @@
 #!/bin/bash
-# Netskope Performance troubleshooting tool
+# Copyright 2022 Netskope Inc
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https:#www.apache.org/licenses/LICENSE-2.0
+#
+# Netskope Performance Troubleshooting Tool
 # Author: Matthieu Bouthors
-# Copyright Netskope
 
 usage() { printf "Usage: $0 [-s <10|100>] [-i <interval>] [-l <loops>] [-c <comment>] [-u <download url>] [-r] [-q] [-n] [-f <folder>] [-p] [-h]
 Options:
@@ -246,17 +253,7 @@ Cprintf(){
 
 
 
-case "$mode" in
-    mac)
-        Cprintf "default" "Mac detected\n"
-        MacDetails=$(system_profiler SPSoftwareDataType SPHardwareDataType)
-        Cprintf "default" "%s\n" "$MacDetails"
-        ;;
-    *)
-        Cprintf "error" "ERROR: Unsupported system\n"
-        exit
-        ;;
-esac
+
 
 Cprintf "report" "***** START ***** %s\n" "$Comment"
 Cprintf "default" "%s Starting $0 %s\n" "$StartTime" "$Arguments"
@@ -282,6 +279,18 @@ Cprintf "report" "%s\n" "$uname"
 
 
 Cprintf "default" "***** DEVICE CONTEXT ***** %s\n" "$Comment"
+
+case "$mode" in
+    mac)
+        Cprintf "default" "*** Mac detected\n"
+        MacDetails=$(system_profiler SPSoftwareDataType SPHardwareDataType)
+        Cprintf "default" "%s\n" "$MacDetails"
+        ;;
+    *)
+        Cprintf "error" "ERROR: Unsupported system\n"
+        exit
+        ;;
+esac
 
 Cprintf "default" "*** Netskope Client Configuration\n"
 if [ -f "$nsdiag" ]; then
