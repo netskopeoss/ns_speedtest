@@ -59,7 +59,7 @@ https://github.com/netskopeoss/ns_speedtest
 
 #! /usr/bin/pwsh
 
-# Copyright 2022 Netskope Inc
+# Copyright 2023 Netskope Inc
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
