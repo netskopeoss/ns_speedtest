@@ -307,12 +307,17 @@ if [ -f "${nsconfig}" ]; then
     Cprintf "default" "DP Gateway LDNS    = %s\n" "${DpGatewayLdns}"
     DpGatewayLdnsIp=$(dig +short "$DpGatewayLdns")
     Cprintf "default" "DP Gateway LDNS IP = %s\n" "${DpGatewayLdnsIp}"
-    Management=$(echo $DpGatewayLdns|cut -d"-" -f2)
-    Cprintf "default" "Management         = %s\n" "${Management}"
-    Achecker="achecker-$Management"
-    Cprintf "default" "Achercker          = %s\n" "${Achecker}"
-    AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
-    Cprintf "default" "Achecker Download   = %s\n" "${AcheckerUrl}"
+    if [[ $DpGatewayLdns =~ gateway-(.*) ]]; then
+        Management=${BASH_REMATCH[1]}
+        Cprintf "default" "Management         = %s\n" "${Management}"
+        Achecker="achecker-$Management"
+        Cprintf "default" "Achercker          = %s\n" "${Achecker}"
+        AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
+        Cprintf "default" "Achecker Download   = %s\n" "${AcheckerUrl}"
+    else
+        Cprintf "error" "Management domain not found\n"
+        Connected=false
+    fi
 else
     Cprintf  "error" "WARNING: Netskope Client Configuration file not found\n"
 fi
