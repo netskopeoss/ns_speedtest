@@ -307,6 +307,13 @@ If($ClientConfiguration -match "NSTUNNEL_CONNECTED")
    }else{
       Cprintf -Mode "default" -Text "Gateway IP not found" 
    }
+   
+   if (-Not $AcheckerUrl)
+   {
+	   Cprintf -Mode "error" -Text "WARNING: achecker url missing, disabling tunnel test"
+	   $Connected=$false
+   }
+   
 
 }else{
    $Connected=$false
