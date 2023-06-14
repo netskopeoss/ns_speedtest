@@ -20,7 +20,7 @@ Options:
 -r report mode, enable report mode on stdout, providing verbose output
 -q quiet mode, disable output to the stdout
 -n No Files mode, disable saving results in files
--f custom folder to save log files, by default Netskope Client log folder is used
+-f custom folder to save log files, by default local folder is used
 -p perform inner capture at the same time
 -h help\n" 1>&2; exit 1; }
 
@@ -121,18 +121,8 @@ uname=$(uname -a)
 if [[ "$uname" =~ Darwin ]]; then
     mode="mac"
     if [ "$OutputFolder" == false ]; then
-        OutputFolder="/Library/Logs/Netskope"
-    fi
-else
-    printf "ERROR: Unsupported system\n"
-    exit
-fi
-
-#Output folder control
-if [ "$NoFiles" == false ]; then
-    if [ ! -d "$OutputFolder" ]; then
         while true; do
-            read -p "Log folder not found, do you want to log in the local folder ([Y]es/No/Cancel)?" ync
+            read -p "Do you want to log in the local folder ([Y]es/No/Cancel)?" ync
             case $ync in
                 [Yy]* ) OutputFolder="."; break;;
                 "")     OutputFolder="."; break;;
@@ -142,6 +132,9 @@ if [ "$NoFiles" == false ]; then
             esac
         done
     fi
+else
+    printf "ERROR: Unsupported system\n"
+    exit
 fi
 
 # Setting up file names
