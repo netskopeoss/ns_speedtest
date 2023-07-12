@@ -111,6 +111,14 @@ ns_speedtest.ps1 -Loops 3 -Interval 5
 
 
 # Mac
+## Requirements
+Rights to execute script.
+
+The following command needs to be performed to make the script executable
+```
+chmod a+x ns_speedtest.sh
+```
+
 ## Usage
 ```
 Usage: ./ns_speedtest.sh [-s <10|100>] [-i <interval>] [-l <loops>] [-c <comment>] [-u <download url>] [-r] [-q] [-n] [-f <folder>] [-p] [-h]
