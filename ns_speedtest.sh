@@ -365,6 +365,10 @@ fi
 
 PingPid=false
 TopPid=false
+
+# On recent Mac OS, ping is not in path anymore
+which ping > /dev/null ||export PATH="$PATH:/sbin"
+
 if [ "$NoFiles" == false ]; then
     eval "ping --apple-time -c${DefaultMaxStats} ${PingDest} >> $OutputFileLatency&"
     PingPid=$!
