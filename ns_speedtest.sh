@@ -535,10 +535,10 @@ function Analyze() {
     Filter=$1
     shift
 
-    Max=false
-    Min=false
-    Total=false
-    Avg=false
+    Max=-1
+    Min=-1
+    Total=-1
+    Avg=-1
     Index=0
     Count=0
 
@@ -548,7 +548,7 @@ function Analyze() {
 
         if [[ ${DestinationType[$Index]} =~ $Filter ]]
         then
-            if [ "$Max" == false ]
+            if [ "$Max" == "-1" ]
             then
                 Max=$Value
                 Min=$Value
