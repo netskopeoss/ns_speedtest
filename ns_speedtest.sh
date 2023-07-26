@@ -9,6 +9,10 @@
 #
 # Netskope Performance Troubleshooting Tool
 # Author: Matthieu Bouthors
+set -e
+
+# printf is subject to locale settings => we force en_US to avoid issue with numbers
+export LANG="en_US.UTF-8"
 
 usage() { printf "Usage: $0 [-s <10|100>] [-i <interval>] [-l <loops>] [-c <comment>] [-u <download url>] [-r] [-q] [-n] [-f <folder>] [-p] [-h]
 Options:
@@ -295,6 +299,7 @@ else
 fi
 
 Cprintf "default" "*** Netskope context\n"
+Connected=false
 if [ -f "${nsconfig}" ]; then
     DpGatewayLdns=$(grep '"host": "gateway-' "${nsconfig}"|cut -d'"' -f4)
     Cprintf "default" "DP Gateway LDNS    = %s\n" "${DpGatewayLdns}"
@@ -307,12 +312,15 @@ if [ -f "${nsconfig}" ]; then
         Cprintf "default" "Achercker          = %s\n" "${Achecker}"
         AcheckerUrl="https://$Achecker/downloadsize=${Size}m"
         Cprintf "default" "Achecker Download   = %s\n" "${AcheckerUrl}"
+        Connected=true
     else
         Cprintf "error" "Management domain not found\n"
-        Connected=false
     fi
 else
     Cprintf  "error" "WARNING: Netskope Client Configuration file not found\n"
+    if [ -f "${nsconfig}.enc" ]; then
+        Cprintf  "error" "*** ${nsconfig} is not present, but ${nsconfig}.enc exists! ***\n"
+    fi
 fi
 
 if [[ "${ClientConfiguration}" =~ NSTUNNEL_CONNECTED ]]
@@ -365,6 +373,10 @@ fi
 
 PingPid=false
 TopPid=false
+
+# On recent Mac OS, ping is not in path anymore
+which ping > /dev/null ||export PATH="$PATH:/sbin"
+
 if [ "$NoFiles" == false ]; then
     eval "ping --apple-time -c${DefaultMaxStats} ${PingDest} >> $OutputFileLatency&"
     PingPid=$!
@@ -398,6 +410,11 @@ SpeedTest() {
     local url="$2"
     local UrlType="$3"
     DateStr[$i]=`date -Iseconds`
+    if [[ ${url:-} == "" ]]
+    then
+      echo "No URL has been provided: i=$i, url=$url, UrlType=$UrlType"
+      exit 666
+    fi
     Cprintf "default" "*** %s Test %i %s...\n" "${DateStr[$i]}" "$i" "${url}"
     res=$(curl -s -L -k -o /dev/null --write-out "${CurlFormat}" "${url}")
     Cprintf "report" "Curl output: %s\n" "$res"
@@ -467,7 +484,7 @@ for (( i=1; i<=$Loops; i++ ))
 do
 
 #If connected, testing Dataplane first
-    if [ "$Connected" == true ]; then
+    if [ "$Connected" == true -a "${Achecker:-}" != "" ]; then
     	((Index++))
         SpeedTest "$Index" "${AcheckerUrl}" "achecker"
         StatusCode="${HttpCode[$Index]}"
@@ -518,10 +535,10 @@ function Analyze() {
     Filter=$1
     shift
 
-    Max=false
-    Min=false
-    Total=false
-    Avg=false
+    Max=-1
+    Min=-1
+    Total=-1
+    Avg=-1
     Index=0
     Count=0
 
@@ -531,7 +548,7 @@ function Analyze() {
 
         if [[ ${DestinationType[$Index]} =~ $Filter ]]
         then
-            if [ "$Max" == false ]
+            if [ "$Max" == "-1" ]
             then
                 Max=$Value
                 Min=$Value
